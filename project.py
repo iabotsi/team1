@@ -3,80 +3,16 @@ import math
 import random as rnd
 import queue as q
 import matplotlib.pyplot as plt
-
-
-
-class Tsp:
-    def __init__(self,filename):
-        self.Mylist=[]
-        self.Mylist= self.myList(filename)  # The function myList(self) reads the file and put the names of cities and x,y cordinates in two diffrent list eg[[cities],[(x,y)]] 
-        self.cities=self.Mylist[0]                  # This is a list containing cities only ie. [cities]
-        self.cordinate=self.Mylist[1]           # This list contains cordinates point only 
-        self.distance=self.distance()           # This is a list of distance for the entire data. this list contains 50 sublist [[list1],[list2]...........[list50]]
-
-
-
-    def myList(self,filename):
-        f = open(filename)
-        cities=[]
- 
-        cordxy=[]
-        for line in f:
-            alist = line.split(';') 
-            for i in range(0,len(alist)):
-                alist[i] = alist[i].rstrip('\n')
-                alist[i]=alist[i].rstrip(',')
-            cities.append(alist[0])
-            x=int(alist[1])
-            y=int(alist[2])
-            cordxy.append( (x,y) )
-        self.Mylist.extend([cities,cordxy])
-        f.close()
-        return(self.Mylist)
-
-    def distance(self):
-        dis=[]
-        size=len(self.cordinate)
-        for cd in range(0,size):
-            deem=[]
-            for uu in range(0,size):
-                me=(self.cordinate[cd][0]-self.cordinate[uu][0])**2+(self.cordinate[cd][1]-self.cordinate[uu][1])**2
-                me=(me)**0.5
-                deem.append(me*56.9)
-            dis.append(deem)
-        return(dis)
-
-    def getcityanddistance(self,n):                     # This methods returns the name of the city and its distance from each city
-        return(self.cities[n],self.distance[n])
         
- 
-
-    
-            
-t = Tsp('tour48pro.csv')   # To test the function
-print(t.Mylist)
-print()
-print(t.cordinate)
-print()
-print(t.cities)
-print()
-print(t.getcityanddistance(2))
-print()
-
-
-
-
-
-
-    
-
-
 
 class Cities(object):
+    '''
+    To store city information, location and name
+    '''
     
     def __init__(self):
-        self.names = {}
-        self.coord = list()
+        self.names = []
+        self.coord = []
         
     def getCity(self, idx):
         return self.names[idx]
@@ -86,7 +22,7 @@ class Cities(object):
     
     def addCity(self, cityName, x, y):
         self.coord.append((x, y))
-        self.names[len(self.coord)-1] = cityName
+        self.names.append(cityName)
         
     def getCoordinates(self):
         return self.coord
@@ -123,51 +59,110 @@ class TSP(object):
         self.cities = cities
         self.marked = []
         self.noOfCities = len(cities.getCoordinates())
-        for idx in range(0, self.noOfCities):
+        self.distance = []          #to store the distances between two cities
+        for idx in range(0, self.noOfCities):   #to see if the city has been visited
             self.marked.append(False)
+        self.setDistance()
+
+    def getDistance(self, cityA, cityB):
+        return (((cityA[0] - cityB[0])**2 + (cityA[1] - cityB[1])**2)**0.5) * 56.9
+
+    def setDistance(self):
+        '''
+        set distance matrix
+        '''
+        rowList = []
+        for i in range(self.noOfCities):
+            for j in range(self.noOfCities):
+                rowList.append(self.getDistance(self.cities.getCityCoord(i),self.cities.getCityCoord(j)))
+            self.distance.append(rowList)
+            rowList = []
+        #print(self.distance)
         
-#    def areAllCitiesVisited(self):
-#        visited = True
-#        for idx in range(0, self.noOfCities):
-#            if not self.marked[idx]:
-#                visited = False
-#                break
-#        return visited
-        
+    def evaluate(self, solution):
+        '''
+        get totalDistance of different solution(solution not include the distance back to 1st city)
+        '''
+        dist = 0
+        for i in range(1,len(solution)):
+            dist += self.distance[solution[i-1]][solution[i]]
+        dist += self.distance[solution[-1]][solution[0]]
+        #back to first city
+        return dist
+
     def greedySolution(self):
         rnd.seed(29)
         startidx = rnd.randint(0, (len(self.cities.getCoordinates())-1))
         self.marked[startidx] = True
-        minpq = q.PriorityQueue()
+        minpq = q.PriorityQueue()   #to get the minimum distance
         currentCity = startidx
         solution = []
         solution.append(currentCity)
-        totalDistance = 0.0
+        
         while len(solution) != self.noOfCities:
             for idx in range(0, self.noOfCities):
                 if not self.marked[idx]:
-                    dist = self.getDistance(self.cities.getCityCoord(currentCity), self.cities.getCityCoord(idx))
+                    dist = self.distance[currentCity][idx]
                     minpq.put((dist, idx))
             item = minpq.get()
-            totalDistance += item[0]
             currentCity = item[1]
             solution.append(currentCity)
             self.marked[item[1]] = True
             minpq = q.PriorityQueue()
         solution.append(startidx)
+        totalDistance = self.evaluate(solution[:-1])
+
         return totalDistance, solution
     
-    def improveSol(self, solution, limit):
-        pass
-    
     def randomHillClimbingLS(self, limit):
-        pass
-        
-    def getDistance(self, cityA, cityB):
-        return (((cityA[0] - cityB[0])**2 + (cityA[1] - cityB[1])**2)**0.5) * 56.9
-    
-    def showGreedySolution(self):
         totalDistance, solution = self.greedySolution()
+        #print("greedy:",totalDistance)
+        dist_best = totalDistance
+        rnd.seed(39)
+        s_best = solution[:-1]
+        step = 0    #to record it cost how many times to get best solution
+        
+        for i in range(limit):
+            temp = s_best[:]
+            ran1 = rnd.randint(1, len(solution)-2)
+            ran2 = rnd.randint(1, len(solution)-2)
+            while ran1==ran2:
+                ran2 = rnd.randint(1, len(solution)-2)
+
+            #change 2 city position in s_best
+            temp[ran1], temp[ran2] = temp[ran2], temp[ran1]
+            temp_dist = self.evaluate(temp)
+
+            #judge if the temp solution is better than s_best
+            if dist_best>temp_dist:
+                dist_best = temp_dist
+                s_best = temp[:]
+                #dist_best, s_best = self.removeCross(temp)
+                step = i
+        
+        #print("best step:", step)
+        s_best.append(s_best[0])
+        return dist_best, s_best
+    
+    def removeCross(self, temp):
+        '''
+        To eliminate the cross line, not finish
+        '''
+        k = len(temp)
+        for i in range(0, k-2):
+            for j in range(i+2,k-1):
+                i_i1 = self.distance[temp[i]][temp[i+1]]
+                j_j1 = self.distance[temp[j]][temp[j+1]]
+                i_j1 = self.distance[temp[i]][temp[j+1]]
+                j_i1 = self.distance[temp[j]][temp[i+1]]
+                if i_i1+j_j1>i_j1+j_i1:
+                    temp[i+1],temp[j+1] = temp[j+1],temp[i+1]
+        dist = self.evaluate(temp)
+        return dist, temp
+
+    def showSolution(self):
+        limit = 10000    #iteration times
+        totalDistance, solution = self.randomHillClimbingLS(limit)
         print("Best found distance: %.2f miles\n" % totalDistance)
         s = self.cities.getCity(solution[0])
         for idx in solution[1:]:
@@ -199,7 +194,8 @@ class TSP(object):
         
 
 if __name__ == "__main__":
-    fname = sys.argv[1]
+
+    fname = "tour48pro.csv"
     cities = Cities()
     fl = open(fname)
     for line in fl:
@@ -211,7 +207,7 @@ if __name__ == "__main__":
     fl.close()
     #cities.toString()
     tsp = TSP(cities)
-    tsp.showGreedySolution()
+    tsp.showSolution()
             
 
 
